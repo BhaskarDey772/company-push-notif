@@ -1,11 +1,12 @@
 {
   "name": "@bhaskardey772/push-notif-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Backend helper for Firebase Cloud Messaging — send push notifications to devices, topics, and conditions without boilerplate",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -22,6 +23,15 @@
     "typescript"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BhaskarDey772/company-push-notif",
+    "directory": "packages/backend"
+  },
+  "homepage": "https://github.com/BhaskarDey772/company-push-notif#readme",
+  "bugs": {
+    "url": "https://github.com/BhaskarDey772/company-push-notif/issues"
+  },
   "engines": {
     "node": ">=16"
   },
