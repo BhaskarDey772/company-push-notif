@@ -1,0 +1,41 @@
+{
+  "name": "@bhaskardey772/push-notif-frontend",
+  "version": "1.0.0",
+  "description": "Frontend helper for Firebase Cloud Messaging — request permission, get FCM tokens, and handle push notifications without boilerplate",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "files": [
+    "src",
+    "firebase-messaging-sw.js"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "prepublishOnly": "node -e \"require('fs').existsSync('src/index.js') || process.exit(1)\""
+  },
+  "keywords": [
+    "firebase",
+    "fcm",
+    "push-notification",
+    "cloud-messaging",
+    "browser",
+    "service-worker",
+    "typescript"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
+  "peerDependencies": {
+    "firebase": ">=10.0.0"
+  },
+  "devDependencies": {
+    "firebase": "^10.0.0"
+  }
+}

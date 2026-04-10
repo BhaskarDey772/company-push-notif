@@ -1,0 +1,7 @@
+# Source — only dist/ is published (controlled by "files" in package.json)
+src/
+tsconfig.json
+
+# Dev artifacts
+node_modules/
+*.log
