@@ -1,6 +1,6 @@
 {
   "name": "@bhaskardey772/push-notif-backend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Backend helper for Firebase Cloud Messaging — send push notifications to devices, topics, and conditions without boilerplate",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
