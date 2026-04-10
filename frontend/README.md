@@ -55,25 +55,13 @@ npm install @bhaskardey772/push-notif-frontend firebase
 
 ### 2. Add the service worker
 
-Copy the service worker template that ships with this package into your project's `public/` directory:
+Copy the service worker template into your project's `public/` directory:
 
 ```bash
 cp node_modules/@bhaskardey772/push-notif-frontend/firebase-messaging-sw.js public/
 ```
 
-Then open `public/firebase-messaging-sw.js` and fill in your Firebase config (the same object you pass to `init()`):
-
-```js
-// public/firebase-messaging-sw.js — fill in the firebaseConfig below
-firebase.initializeApp({
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT.firebasestorage.app',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
-});
-```
+**No config needed inside the file.** The package automatically sends your `firebaseConfig` to the service worker when you call `init()`, so you only configure it in one place — your app code.
 
 The service worker must be at the root path — `/firebase-messaging-sw.js`. Vite and Create React App both copy everything from `public/` to the build root automatically.
 

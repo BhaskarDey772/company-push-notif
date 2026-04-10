@@ -19,15 +19,35 @@ export async function init({ firebaseConfig, vapidKey, serviceWorkerPath = '/fir
   _messaging = getMessaging(app);
   _vapidKey = vapidKey;
 
-  if ('serviceWorker' in navigator) {
-    try {
-      _swRegistration = await navigator.serviceWorker.register(serviceWorkerPath);
-    } catch (err) {
-      console.error('[@bhaskardey772/push-notif-frontend] Service worker registration failed:', err);
-      throw err;
-    }
-  } else {
+  if (!('serviceWorker' in navigator)) {
     throw new Error('[@bhaskardey772/push-notif-frontend] Service workers are not supported in this browser.');
+  }
+
+  try {
+    _swRegistration = await navigator.serviceWorker.register(serviceWorkerPath);
+
+    // Wait for the SW to be active (handles both fresh install and already-active)
+    const sw = _swRegistration.installing || _swRegistration.waiting || _swRegistration.active;
+    if (sw && sw.state !== 'activated') {
+      await new Promise((resolve) => {
+        sw.addEventListener('statechange', function handler(e) {
+          if (e.target.state === 'activated') {
+            sw.removeEventListener('statechange', handler);
+            resolve();
+          }
+        });
+      });
+    }
+
+    // Post the Firebase config to the SW so it can self-initialize.
+    // This eliminates the need for users to paste their config twice.
+    const activeSW = _swRegistration.active;
+    if (activeSW) {
+      activeSW.postMessage({ type: 'FIREBASE_CONFIG', firebaseConfig });
+    }
+  } catch (err) {
+    console.error('[@bhaskardey772/push-notif-frontend] Service worker registration failed:', err);
+    throw err;
   }
 }
 
