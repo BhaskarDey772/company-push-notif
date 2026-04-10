@@ -12,9 +12,8 @@ Framework-agnostic (works with React, Vue, Svelte, vanilla JS/TS, or any bundler
 ## Table of Contents
 
 - [Requirements](#requirements)
-- [Installation](#installation)
 - [Setup](#setup)
-  - [1. Install the package](#1-install-the-package)
+  - [1. Install](#1-install)
   - [2. Add the service worker](#2-add-the-service-worker)
   - [3. Configure your bundler](#3-configure-your-bundler)
 - [Usage](#usage)
@@ -22,15 +21,15 @@ Framework-agnostic (works with React, Vue, Svelte, vanilla JS/TS, or any bundler
   - [Request Permission & Get Token](#request-permission--get-token)
   - [Listen for Foreground Messages](#listen-for-foreground-messages)
   - [Get Token Without Prompting](#get-token-without-prompting)
-  - [Delete Token (Logout / Opt-out)](#delete-token-logout--opt-out)
+  - [Unsubscribe / Delete Token](#unsubscribe--delete-token)
   - [Check Permission State](#check-permission-state)
 - [Framework Examples](#framework-examples)
   - [React](#react)
   - [Vue 3](#vue-3)
   - [Vanilla TypeScript](#vanilla-typescript)
 - [API Reference](#api-reference)
-- [TypeScript](#typescript)
 - [How Notifications Work](#how-notifications-work)
+- [TypeScript](#typescript)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -38,14 +37,14 @@ Framework-agnostic (works with React, Vue, Svelte, vanilla JS/TS, or any bundler
 ## Requirements
 
 - A browser that supports [Web Push](https://caniuse.com/push-api) (Chrome 50+, Firefox 44+, Edge 17+, Safari 16+)
-- A bundler — Vite, webpack, Rollup, Parcel, etc. (this package uses ES module imports from `firebase`)
+- A bundler — Vite, webpack, Rollup, Parcel, etc.
 - A Firebase project with Cloud Messaging enabled
 
 ---
 
-## Installation
+## Setup
 
-### 1. Install the package
+### 1. Install
 
 ```bash
 npm install @bhaskardey772/push-notif-frontend firebase
@@ -55,19 +54,19 @@ npm install @bhaskardey772/push-notif-frontend firebase
 
 ### 2. Add the service worker
 
-Copy the service worker template into your project's `public/` directory:
+Copy the service worker that ships with this package into your `public/` folder:
 
 ```bash
 cp node_modules/@bhaskardey772/push-notif-frontend/firebase-messaging-sw.js public/
 ```
 
-**No config needed inside the file.** The package automatically sends your `firebaseConfig` to the service worker when you call `init()`, so you only configure it in one place — your app code.
+> **No config needed inside the file.** When you call `init()`, the package automatically sends your `firebaseConfig` to the service worker. You only configure Firebase in one place — your app code.
 
-The service worker must be at the root path — `/firebase-messaging-sw.js`. Vite and Create React App both copy everything from `public/` to the build root automatically.
+The file must be served at the root path `/firebase-messaging-sw.js`. Vite and Create React App copy everything from `public/` to the build root automatically.
 
 ### 3. Configure your bundler
 
-Because `firebase` is a peer dependency inside a locally-linked package, some bundlers need a hint to resolve it from your project's `node_modules`. Add this to your Vite config:
+Add this to your Vite config so `firebase` resolves correctly from your project's `node_modules`:
 
 ```ts
 // vite.config.ts
@@ -82,14 +81,12 @@ export default defineConfig({
 });
 ```
 
-For **webpack**, add to `resolve.alias`:
+For **webpack**:
 ```js
 // webpack.config.js
 module.exports = {
   resolve: {
-    alias: {
-      firebase: path.resolve(__dirname, 'node_modules/firebase'),
-    },
+    alias: { firebase: path.resolve(__dirname, 'node_modules/firebase') },
   },
 };
 ```
@@ -100,7 +97,7 @@ module.exports = {
 
 ### Initialize
 
-Call `init()` once when your app starts — before using any other function.
+Call `init()` **once** when your app starts. It registers the service worker and posts your Firebase config to it automatically.
 
 ```ts
 import * as notif from '@bhaskardey772/push-notif-frontend';
@@ -115,7 +112,6 @@ await notif.init({
     appId: 'YOUR_APP_ID',
   },
   vapidKey: 'YOUR_VAPID_KEY',
-  // serviceWorkerPath: '/firebase-messaging-sw.js', // default, change if needed
 });
 ```
 
@@ -124,7 +120,7 @@ await notif.init({
 | Credential | Location |
 |---|---|
 | `firebaseConfig` | Firebase Console → Project Settings → Your apps → Web app |
-| `vapidKey` | Firebase Console → Project Settings → Cloud Messaging → **Web Push certificates** |
+| `vapidKey` | Firebase Console → Project Settings → Cloud Messaging → Web Push certificates |
 
 ---
 
@@ -134,7 +130,7 @@ await notif.init({
 const token = await notif.requestPermission();
 
 if (token) {
-  // Send the token to your backend so it can target this device
+  // Send token to your backend to register this device
   await fetch('/api/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -142,61 +138,58 @@ if (token) {
   });
 } else {
   // User denied — do not re-prompt immediately
-  console.warn('Notification permission denied');
 }
 ```
 
-- Shows the browser's native permission dialog if not yet decided
-- Returns the FCM token string on `'granted'`, or `null` on `'denied'` / `'default'`
-- Safe to call multiple times — only prompts once per browser session
+- Shows the browser's native permission dialog if not yet answered
+- Returns the FCM token string on `'granted'`, or `null` on `'denied'`
 
 ---
 
 ### Listen for Foreground Messages
 
-FCM suppresses native popups when the browser tab is open. Use `onForegroundMessage` to handle these yourself:
+FCM suppresses the native popup when the browser tab is open. Fire `new Notification()` yourself so the user sees it from the top:
 
 ```ts
-const unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl, data }) => {
-  // Show a native OS notification (appears from the top, same as background)
-  new Notification(title, { body, icon: imageUrl });
-
-  // Or show an in-app alert/toast
-  showAlert(title, body);
+const unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl }) => {
+  new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
 });
 
-// Stop listening when component/page unmounts
+// Stop listening when component unmounts
 unsubscribe();
 ```
-
-The handler receives a normalized `IncomingNotification` object — no need to dig through the raw FCM payload.
 
 ---
 
 ### Get Token Without Prompting
 
-If the user already granted permission (e.g. on a previous session), retrieve the token silently:
+On app load, silently check if a token already exists from a previous session:
 
 ```ts
 const token = await notif.getDeviceToken();
-// Returns the token string, or null if permission was not yet granted
+// Returns token string, or null if permission not yet granted
 ```
-
-Use this on app load to check whether you already have a valid token without annoying the user with a prompt.
 
 ---
 
-### Delete Token (Logout / Opt-out)
+### Unsubscribe / Delete Token
 
-When a user logs out or explicitly turns off notifications, delete their token:
+On logout or when the user opts out:
 
 ```ts
-await notif.deleteToken();
-// Also unregister on your backend:
-await fetch('/api/unsubscribe', { method: 'POST', body: JSON.stringify({ token }) });
-```
+// Save token before deleting
+const token = await notif.getDeviceToken();
 
-The next call to `requestPermission()` will generate a fresh token.
+// 1. Remove from FCM
+await notif.deleteToken();
+
+// 2. Remove from your backend
+await fetch('/api/unsubscribe', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ token }),
+});
+```
 
 ---
 
@@ -207,10 +200,10 @@ const state = notif.getPermissionState();
 // 'granted' | 'denied' | 'default'
 
 if (state === 'denied') {
-  // User blocked notifications — show a guide to re-enable in browser settings
+  // Show guide to re-enable in browser settings
 }
 if (state === 'default') {
-  // Not yet decided — safe to show a prompt
+  // Not yet decided — safe to call requestPermission()
 }
 ```
 
@@ -220,49 +213,92 @@ if (state === 'default') {
 
 ### React
 
-```tsx
-// hooks/useNotifications.ts
-import { useEffect } from 'react';
+Create a hook (`src/hooks/usePushNotifications.ts`):
+
+```ts
+import { useEffect, useRef, useState } from 'react';
 import * as notif from '@bhaskardey772/push-notif-frontend';
 
-const FIREBASE_CONFIG = { /* ... */ };
-const VAPID_KEY = 'BPsx...';
+const FIREBASE_CONFIG = {
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT.firebasestorage.app',
+  messagingSenderId: 'YOUR_SENDER_ID',
+  appId: 'YOUR_APP_ID',
+};
+const VAPID_KEY = 'YOUR_VAPID_KEY';
 
-export function useNotifications() {
+export function usePushNotifications() {
+  const [token, setToken]           = useState<string | null>(null);
+  const [permission, setPermission] = useState(notif.getPermissionState());
+  const initialized                 = useRef(false);
+
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
+    // useRef guard prevents double-init in React StrictMode
+    if (initialized.current) return;
+    initialized.current = true;
 
-    async function setup() {
-      await notif.init({ firebaseConfig: FIREBASE_CONFIG, vapidKey: VAPID_KEY });
+    // init() also auto-posts firebaseConfig to the service worker
+    notif.init({ firebaseConfig: FIREBASE_CONFIG, vapidKey: VAPID_KEY });
 
-      unsubscribe = notif.onForegroundMessage(({ title, body }) => {
-        new Notification(title, { body });
-      });
-    }
+    // Foreground: FCM suppresses native popup when tab is open — fire it manually
+    const unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl }) => {
+      new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
+    });
 
-    setup();
-    return () => unsubscribe?.();
+    return () => unsubscribe();
   }, []);
-}
 
-async function subscribe() {
-  const token = await notif.requestPermission();
-  if (token) {
+  async function subscribe() {
+    const fcmToken = await notif.requestPermission();
+    if (!fcmToken) { setPermission(notif.getPermissionState()); return null; }
+
     await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: fcmToken }),
+    });
+
+    setToken(fcmToken);
+    setPermission('granted');
+    return fcmToken;
+  }
+
+  async function unsubscribe() {
+    if (!token) return;
+    await notif.deleteToken();
+    await fetch('/api/unsubscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     });
+    setToken(null);
+    setPermission('default');
   }
-  return token;
-}
 
-// App.tsx
-import { useNotifications } from './hooks/useNotifications';
+  return { token, permission, subscribe, unsubscribe };
+}
+```
+
+Use in any component (`src/App.tsx`):
+
+```tsx
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 export default function App() {
-  useNotifications();
-  return <button onClick={subscribe}>Enable Notifications</button>;
+  const { token, permission, subscribe, unsubscribe } = usePushNotifications();
+
+  return (
+    <div>
+      {permission === 'granted' ? (
+        <button onClick={unsubscribe}>Unsubscribe</button>
+      ) : (
+        <button onClick={subscribe}>Enable Notifications</button>
+      )}
+      {token && <p>Token: {token.slice(0, 20)}…</p>}
+    </div>
+  );
 }
 ```
 
@@ -271,39 +307,55 @@ export default function App() {
 ### Vue 3
 
 ```ts
-// composables/useNotifications.ts
-import { onMounted, onUnmounted } from 'vue';
+// composables/usePushNotifications.ts
+import { onMounted, onUnmounted, ref } from 'vue';
 import * as notif from '@bhaskardey772/push-notif-frontend';
 
 const FIREBASE_CONFIG = { /* ... */ };
-const VAPID_KEY = 'BPsx...';
+const VAPID_KEY = 'YOUR_VAPID_KEY';
 
-export function useNotifications() {
+export function usePushNotifications() {
+  const token      = ref<string | null>(null);
+  const permission = ref(notif.getPermissionState());
   let unsubscribe: (() => void) | undefined;
 
   onMounted(async () => {
     await notif.init({ firebaseConfig: FIREBASE_CONFIG, vapidKey: VAPID_KEY });
 
-    unsubscribe = notif.onForegroundMessage(({ title, body }) => {
-      new Notification(title, { body });
+    unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl }) => {
+      new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
     });
   });
 
   onUnmounted(() => unsubscribe?.());
 
   async function subscribe() {
-    const token = await notif.requestPermission();
-    if (token) {
-      await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-    }
-    return token;
+    const fcmToken = await notif.requestPermission();
+    if (!fcmToken) { permission.value = notif.getPermissionState(); return; }
+
+    await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: fcmToken }),
+    });
+
+    token.value = fcmToken;
+    permission.value = 'granted';
   }
 
-  return { subscribe };
+  async function unsubscribeDevice() {
+    if (!token.value) return;
+    await notif.deleteToken();
+    await fetch('/api/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token.value }),
+    });
+    token.value = null;
+    permission.value = 'default';
+  }
+
+  return { token, permission, subscribe, unsubscribeDevice };
 }
 ```
 
@@ -316,20 +368,34 @@ export function useNotifications() {
 import * as notif from '@bhaskardey772/push-notif-frontend';
 
 const FIREBASE_CONFIG = { /* ... */ };
-const VAPID_KEY = 'BPsx...';
+const VAPID_KEY = 'YOUR_VAPID_KEY';
 
+// 1. Init — registers SW and sends config to it automatically
 await notif.init({ firebaseConfig: FIREBASE_CONFIG, vapidKey: VAPID_KEY });
 
-// Listen for foreground messages
-const unsubscribe = notif.onForegroundMessage(({ title, body }) => {
-  new Notification(title, { body });
+// 2. Foreground messages → native OS popup
+notif.onForegroundMessage(({ title, body, imageUrl }) => {
+  new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
 });
 
-// Wire up your UI
-document.getElementById('enableBtn')!.addEventListener('click', async () => {
+// 3. Subscribe button
+document.getElementById('subscribeBtn')!.addEventListener('click', async () => {
   const token = await notif.requestPermission();
   if (token) {
     await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+  }
+});
+
+// 4. Unsubscribe button
+document.getElementById('unsubscribeBtn')!.addEventListener('click', async () => {
+  const token = await notif.getDeviceToken();
+  await notif.deleteToken();
+  if (token) {
+    await fetch('/api/unsubscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
@@ -344,7 +410,7 @@ document.getElementById('enableBtn')!.addEventListener('click', async () => {
 
 ### `init(options): Promise<void>`
 
-Initialize the helper. Must be called before any other function.
+Registers the service worker and automatically posts `firebaseConfig` to it. Must be called before any other function.
 
 ```ts
 interface InitOptions {
@@ -362,65 +428,53 @@ interface InitOptions {
 }
 ```
 
----
-
 ### `requestPermission(): Promise<string | null>`
 
-Shows the browser permission dialog (if not already answered). Returns the FCM token, or `null` if denied.
-
----
+Shows the browser permission dialog. Returns the FCM token, or `null` if denied.
 
 ### `getDeviceToken(): Promise<string | null>`
 
-Returns the current FCM token without prompting. Returns `null` if permission has not been granted.
-
----
+Returns the current FCM token without prompting. Returns `null` if permission not granted.
 
 ### `getPermissionState(): 'granted' | 'denied' | 'default'`
 
-Returns the current notification permission state synchronously.
-
----
+Returns the current permission state synchronously.
 
 ### `onForegroundMessage(handler): () => void`
 
-Listens for push messages while the browser tab is open. Returns an unsubscribe function.
+Fires when a push message arrives while the tab is open. Returns an unsubscribe function.
 
 ```ts
 interface IncomingNotification {
   title: string;
   body: string;
   imageUrl: string;
-  data: Record<string, string>; // Custom key-value pairs from the sender
-  raw: unknown;                 // Full raw FCM payload (advanced use)
+  data: Record<string, string>;
+  raw: unknown;
 }
 ```
 
----
-
 ### `deleteToken(): Promise<boolean>`
 
-Deletes the FCM token from the browser and FCM server. Returns `true` on success.
+Deletes the FCM token from the browser. Call this on logout or opt-out, then also notify your backend.
 
-After calling this, also tell your backend to remove the token from its store:
+---
 
-```ts
-const token = await notif.getDeviceToken(); // save before deleting
+## How Notifications Work
 
-await notif.deleteToken();
+| App state | What happens |
+|---|---|
+| **Tab open** | `onForegroundMessage` fires — call `new Notification()` yourself |
+| **Tab closed, browser running** | Service worker wakes up → shows native OS popup automatically |
+| **Browser fully closed** | Queued by the OS push service, delivered when browser next starts |
 
-await fetch('/api/unsubscribe', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ token }),
-});
-```
+The service worker (`firebase-messaging-sw.js`) receives its Firebase config from `init()` via `postMessage` — you never need to edit it.
 
 ---
 
 ## TypeScript
 
-Import types directly from the package — no `@types/` needed:
+No `@types/` package needed. Import types directly:
 
 ```ts
 import type { IncomingNotification, InitOptions } from '@bhaskardey772/push-notif-frontend';
@@ -428,36 +482,21 @@ import type { IncomingNotification, InitOptions } from '@bhaskardey772/push-noti
 
 ---
 
-## How Notifications Work
-
-Understanding when each handler fires helps you build the right UX:
-
-| App state | What happens |
-|---|---|
-| **Tab is open** | FCM calls `onForegroundMessage` — native popup is suppressed. Call `new Notification()` yourself. |
-| **Tab is closed, browser running** | Service worker's `onBackgroundMessage` fires → shows native OS popup from the top |
-| **Browser completely closed** | Push is queued by the browser's push service. Delivered when browser next starts. |
-
-The service worker (`firebase-messaging-sw.js`) handles the background case automatically — you only need to wire up `onForegroundMessage` in your app code.
-
----
-
 ## Troubleshooting
 
 **"Service worker registration failed"**
-- The file must be at exactly `/firebase-messaging-sw.js` (root path). Check that your `public/` folder contains the file and your build tool copies it.
-- On local dev with Vite, make sure you're accessing via `http://localhost` (not an IP). Service workers require a secure origin (`https` or `localhost`).
+- The file must be served at exactly `/firebase-messaging-sw.js`. Check that `public/firebase-messaging-sw.js` exists and your build tool copies it to the root.
+- Service workers require a secure origin. Use `http://localhost` in dev, not an IP address.
 
 **Token is `null` after `requestPermission()`**
-- Check `getPermissionState()` — if it returns `'denied'`, the user must re-enable in browser settings manually. You cannot re-prompt programmatically after a denial.
+- `getPermissionState()` returning `'denied'` means the user blocked notifications. They must re-enable manually in browser settings — you cannot re-prompt programmatically.
 
 **Foreground messages not appearing**
-- Call `new Notification(title, { body })` inside your `onForegroundMessage` handler. FCM suppresses the native popup when the tab is open.
+- Call `new Notification(title, { body })` inside `onForegroundMessage`. FCM suppresses the native popup when the tab is open.
 
 **Background messages not appearing**
-- Verify the Firebase config in `firebase-messaging-sw.js` is correct (copy-paste from Firebase Console).
-- Open DevTools → Application → Service Workers and check the worker is registered and activated.
-- On Chrome, check `chrome://serviceworker-internals` for errors.
+- Open DevTools → Application → Service Workers and confirm the worker is activated.
+- Try unregistering the SW and reloading — the updated SW activates immediately via `skipWaiting`.
 
 **Bundler can't resolve `firebase`**
-- Add the alias config described in [Configure your bundler](#3-configure-your-bundler).
+- Add the alias config from [Configure your bundler](#3-configure-your-bundler).

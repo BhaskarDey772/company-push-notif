@@ -12,18 +12,19 @@ Written in TypeScript. Ships with full type declarations.
 ## Table of Contents
 
 - [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Initialization](#initialization)
-- [Sending Notifications](#sending-notifications)
-  - [Send to a Single Device](#send-to-a-single-device)
-  - [Send to Multiple Devices](#send-to-multiple-devices)
-  - [Send to a Topic](#send-to-a-topic)
-  - [Send to a Condition](#send-to-a-condition)
-- [Topic Management](#topic-management)
+- [Setup](#setup)
+- [Complete Express Example](#complete-express-example)
+- [API](#api)
+  - [init](#initserviceaccount-appname)
+  - [sendToDevice](#sendtodevicetoken-payload)
+  - [sendToDevices](#sendtodevicestokens-payload)
+  - [sendToTopic](#sendtotopictopic-payload)
+  - [sendToCondition](#sendtoconditioncondition-payload)
+  - [subscribeToTopic](#subscribetotopictokens-topic)
+  - [unsubscribeFromTopic](#unsubscribefromtopictokens-topic)
 - [Payload Reference](#payload-reference)
 - [Return Types](#return-types)
 - [Error Handling](#error-handling)
-- [Multi-Project Setup](#multi-project-setup)
 - [TypeScript](#typescript)
 
 ---
@@ -34,159 +35,197 @@ Written in TypeScript. Ships with full type declarations.
 npm install @bhaskardey772/push-notif-backend firebase-admin
 ```
 
-`firebase-admin` is a peer dependency — you install it once in your project and this package uses it.
+`firebase-admin` is a peer dependency — install it once in your project.
 
 ---
 
-## Quick Start
+## Setup
+
+**1. Get your service account file**
+
+Firebase Console → Project Settings → Service Accounts → **Generate new private key**
+
+> ⚠️ Never commit this file. Add it to `.gitignore` and load it via secrets manager or env variable in production.
+
+**2. Initialize once at app startup**
 
 ```ts
 import * as notif from '@bhaskardey772/push-notif-backend';
 
-// 1. Initialize once at app startup
+notif.init(require('./service-account.json'));
+```
+
+That's it. Now call any function.
+
+---
+
+## Complete Express Example
+
+A full working server with device registration, unregistration, and all send methods:
+
+```ts
+import express, { Request, Response } from 'express';
+import * as notif from '@bhaskardey772/push-notif-backend';
+
+// Initialize once
 notif.init(require('./service-account.json'));
 
-// 2. Send a notification
-await notif.sendToDevice(token, {
-  title: 'Order shipped!',
-  body: 'Your order #1234 is on its way.',
+const app = express();
+app.use(express.json());
+
+// Token store — replace with a real database in production
+const tokens = new Set<string>();
+
+// ── Register a device token (called by the frontend after requestPermission())
+app.post('/api/subscribe', (req: Request, res: Response) => {
+  const { token } = req.body;
+  if (!token) { res.status(400).json({ error: 'token required' }); return; }
+  tokens.add(token);
+  res.json({ success: true });
 });
+
+// ── Unregister a device token (called on logout or opt-out)
+app.post('/api/unsubscribe', (req: Request, res: Response) => {
+  const { token } = req.body;
+  if (!token) { res.status(400).json({ error: 'token required' }); return; }
+  tokens.delete(token);
+  res.json({ success: true });
+});
+
+// ── Send to a specific device
+app.post('/api/notify/device', async (req: Request, res: Response) => {
+  const { token, title, body, imageUrl, data } = req.body;
+  try {
+    const result = await notif.sendToDevice(token, { title, body, imageUrl, data });
+    res.json({ success: true, messageId: result.messageId });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── Broadcast to all registered devices
+app.post('/api/notify/all', async (req: Request, res: Response) => {
+  const { title, body, imageUrl, data } = req.body;
+  if (tokens.size === 0) { res.status(400).json({ error: 'No registered tokens' }); return; }
+  try {
+    const result = await notif.sendToDevices([...tokens], { title, body, imageUrl, data });
+    res.json({ success: true, successCount: result.successCount, failureCount: result.failureCount });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── Send to a topic
+app.post('/api/notify/topic', async (req: Request, res: Response) => {
+  const { topic, title, body, imageUrl, data } = req.body;
+  try {
+    const result = await notif.sendToTopic(topic, { title, body, imageUrl, data });
+    res.json({ success: true, messageId: result.messageId });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── Subscribe / unsubscribe tokens to a topic
+app.post('/api/topic/subscribe', async (req: Request, res: Response) => {
+  const { tokens: tokenList, topic } = req.body;
+  try {
+    const result = await notif.subscribeToTopic(tokenList, topic);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/topic/unsubscribe', async (req: Request, res: Response) => {
+  const { tokens: tokenList, topic } = req.body;
+  try {
+    const result = await notif.unsubscribeFromTopic(tokenList, topic);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.listen(3000, () => console.log('Server running on :3000'));
 ```
 
 ---
 
-## Initialization
+## API
 
 ### `init(serviceAccount, appName?)`
 
-Call this **once** at application startup, before using any other function.
+Call **once** at startup before using any other function.
 
 ```ts
-import * as notif from '@bhaskardey772/push-notif-backend';
+// Pass parsed JSON object
+notif.init(require('./service-account.json'));
 
-// Option A — pass the parsed JSON object directly
-import serviceAccount from './service-account.json';
-notif.init(serviceAccount);
+// Or pass absolute path to the file
+notif.init('/etc/secrets/service-account.json');
 
-// Option B — pass an absolute path to the JSON file
-notif.init('/etc/secrets/firebase-service-account.json');
-
-// Option C — multi-project: name the app
+// Multi-project: name each app
 notif.init(serviceAccountA, 'project-a');
 notif.init(serviceAccountB, 'project-b');
 ```
 
-**Where to get the service account file:**
-Firebase Console → Project Settings → Service Accounts → **Generate new private key**
-
-> ⚠️ Never commit the service account JSON to version control. Add it to `.gitignore` and load it from environment secrets or a secrets manager.
-
 ---
 
-## Sending Notifications
+### `sendToDevice(token, payload)`
 
-### Send to a Single Device
+Send to a single device token.
 
 ```ts
-const result = await notif.sendToDevice(token, payload);
+const result = await notif.sendToDevice(token, {
+  title: 'Order shipped!',
+  body: 'Your order #1234 is on its way.',
+  imageUrl: 'https://example.com/image.png',
+  data: { orderId: '1234', clickUrl: '/orders/1234' },
+});
 // result: { messageId: string }
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `token` | `string` | FCM registration token from the frontend |
-| `payload` | `NotificationPayload` | Notification content (see [Payload Reference](#payload-reference)) |
-
-**Example:**
-```ts
-await notif.sendToDevice(token, {
-  title: 'New message',
-  body: 'You have a new message from Alice.',
-  imageUrl: 'https://example.com/avatar.png',
-  data: {
-    chatId: '42',
-    clickUrl: '/messages/42',
-  },
-});
-```
-
 ---
 
-### Send to Multiple Devices
+### `sendToDevices(tokens, payload)`
+
+Send to multiple device tokens. Automatically chunks arrays larger than 500 (FCM limit).
 
 ```ts
-const result = await notif.sendToDevices(tokens, payload);
-// result: { successCount, failureCount, errors }
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `tokens` | `string[]` | Array of FCM registration tokens |
-| `payload` | `NotificationPayload` | Notification content |
-
-- Automatically **chunks arrays larger than 500** (FCM limit per request).
-- Failed tokens are listed individually in `result.errors` — you can use this to clean up invalid tokens from your database.
-
-**Example:**
-```ts
-const result = await notif.sendToDevices(allUserTokens, {
+const result = await notif.sendToDevices(allTokens, {
   title: 'Flash sale!',
   body: '50% off for the next 2 hours.',
 });
+// result: { successCount, failureCount, errors }
 
-console.log(`Delivered: ${result.successCount}`);
-console.log(`Failed:    ${result.failureCount}`);
-
-// Remove invalid tokens from your DB
+// Clean up invalid tokens
 for (const { token, error } of result.errors) {
-  console.warn(`Token failed: ${token} — ${error}`);
+  if (error.includes('not-registered')) await db.tokens.delete(token);
 }
 ```
 
 ---
 
-### Send to a Topic
+### `sendToTopic(topic, payload)`
 
-All devices subscribed to the topic receive the notification.
+Send to all devices subscribed to a topic.
 
-```ts
-const result = await notif.sendToTopic(topic, payload);
-// result: { messageId: string }
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `topic` | `string` | Topic name (no leading `/topics/` prefix required) |
-| `payload` | `NotificationPayload` | Notification content |
-
-**Example:**
 ```ts
 await notif.sendToTopic('breaking-news', {
   title: 'Breaking News',
-  body: 'A major event is unfolding. Tap to read more.',
-  data: { articleId: '789', clickUrl: '/news/789' },
+  body: 'Tap to read more.',
+  data: { clickUrl: '/news/latest' },
 });
 ```
 
 ---
 
-### Send to a Condition
+### `sendToCondition(condition, payload)`
 
-Send to devices that match a boolean expression of topics.
+Send using a boolean topic expression.
 
 ```ts
-const result = await notif.sendToCondition(condition, payload);
-// result: { messageId: string }
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `condition` | `string` | FCM condition expression |
-| `payload` | `NotificationPayload` | Notification content |
-
-**Example:**
-```ts
-// Devices subscribed to 'sports' OR 'cricket'
 await notif.sendToCondition("'sports' in topics || 'cricket' in topics", {
   title: 'Match starts in 30 minutes!',
   body: 'India vs Australia — tap to watch live.',
@@ -195,32 +234,22 @@ await notif.sendToCondition("'sports' in topics || 'cricket' in topics", {
 
 ---
 
-## Topic Management
+### `subscribeToTopic(tokens, topic)`
 
-Subscribe or unsubscribe one or more device tokens to/from a topic.
+Subscribe one or more tokens to a topic.
 
 ```ts
-// Subscribe
-await notif.subscribeToTopic(tokens, topic);
-
-// Unsubscribe
-await notif.unsubscribeFromTopic(tokens, topic);
+await notif.subscribeToTopic(userToken, 'sports');
+await notif.subscribeToTopic([tokenA, tokenB], 'announcements');
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `tokens` | `string \| string[]` | One token or an array of tokens |
-| `topic` | `string` | Topic name |
+---
 
-**Example:**
+### `unsubscribeFromTopic(tokens, topic)`
+
+Unsubscribe one or more tokens from a topic.
+
 ```ts
-// Subscribe a user to the 'sports' topic when they toggle a preference
-await notif.subscribeToTopic(userToken, 'sports');
-
-// Bulk subscribe all tokens
-await notif.subscribeToTopic(allTokens, 'announcements');
-
-// Unsubscribe on opt-out
 await notif.unsubscribeFromTopic(userToken, 'sports');
 ```
 
@@ -228,55 +257,27 @@ await notif.unsubscribeFromTopic(userToken, 'sports');
 
 ## Payload Reference
 
-All send functions accept a `NotificationPayload` object:
-
 ```ts
 interface NotificationPayload {
-  title: string;          // Required — notification title
-  body: string;           // Required — notification body text
-  imageUrl?: string;      // Large image shown below the body
-  icon?: string;          // Small icon URL (web push)
-  data?: Record<string, unknown>; // Custom key-value pairs (auto-stringified)
-  android?: AndroidConfig;  // Raw Firebase AndroidConfig override
-  apns?: ApnsConfig;        // Raw Firebase APNs (iOS) config override
-  webpush?: WebpushConfig;  // Raw Firebase WebpushConfig override
+  title: string;                   // Required
+  body: string;                    // Required
+  imageUrl?: string;               // Large image shown in the notification
+  icon?: string;                   // Small icon (web push)
+  data?: Record<string, unknown>;  // Custom key-value pairs (auto-stringified)
+  android?: AndroidConfig;         // Raw Firebase Android override
+  apns?: ApnsConfig;               // Raw Firebase APNs (iOS) override
+  webpush?: WebpushConfig;         // Raw Firebase Web Push override
 }
 ```
 
-### `data` field
-
-Use `data` to pass custom key-value pairs to the client app. Common uses:
+**`data` field** — pass custom values to the client:
 
 ```ts
 data: {
-  clickUrl: '/orders/123',   // URL to open when notification is tapped
+  clickUrl: '/orders/123',  // URL to open when notification is tapped
   orderId: '123',
-  userId: 42,                // Numbers are auto-converted to strings
-  isPromo: true,             // Booleans too
+  userId: 42,               // Numbers/booleans are auto-converted to strings
 }
-```
-
-> All values are automatically converted to strings — FCM requires this.
-
-### Platform-specific overrides
-
-For advanced cases, you can pass raw Firebase config objects:
-
-```ts
-await notif.sendToDevice(token, {
-  title: 'Hello',
-  body: 'World',
-  android: {
-    priority: 'high',
-    notification: { channelId: 'orders' },
-  },
-  apns: {
-    payload: { aps: { badge: 1, sound: 'default' } },
-  },
-  webpush: {
-    headers: { Urgency: 'high' },
-  },
-});
 ```
 
 ---
@@ -293,10 +294,7 @@ interface SendResult {
 interface BatchResult {
   successCount: number;
   failureCount: number;
-  errors: Array<{
-    token: string;   // The token that failed
-    error: string;   // Reason (e.g. "registration-token-not-registered")
-  }>;
+  errors: Array<{ token: string; error: string }>;
 }
 ```
 
@@ -304,14 +302,12 @@ interface BatchResult {
 
 ## Error Handling
 
-All functions throw on network or authentication errors. Wrap calls in `try/catch`:
-
 ```ts
 try {
   await notif.sendToDevice(token, payload);
 } catch (err) {
   if (err.errorInfo?.code === 'messaging/registration-token-not-registered') {
-    // Token is no longer valid — remove it from your database
+    // Token expired or app uninstalled — remove from your DB
     await db.tokens.delete(token);
   } else {
     console.error('FCM error:', err.message);
@@ -326,26 +322,13 @@ try {
 | `messaging/registration-token-not-registered` | Token expired or app uninstalled — delete it |
 | `messaging/invalid-registration-token` | Malformed token |
 | `messaging/message-rate-exceeded` | Throttled — back off and retry |
-| `messaging/invalid-argument` | Bad payload (check title/body) |
-
----
-
-## Multi-Project Setup
-
-If your backend talks to more than one Firebase project, name each app:
-
-```ts
-notif.init(serviceAccountA, 'project-a');
-notif.init(serviceAccountB, 'project-b');
-```
-
-> Note: The current version routes all calls through the last-initialized app. For full multi-project support, initialize the Firebase Admin SDK directly and pass the `Messaging` instance per call — this is on the roadmap.
+| `messaging/invalid-argument` | Bad payload (missing title or body) |
 
 ---
 
 ## TypeScript
 
-The package is written in TypeScript and ships with full type declarations. Import types as needed:
+Full type declarations are included. No `@types/` package needed.
 
 ```ts
 import type {
@@ -354,5 +337,3 @@ import type {
   BatchResult,
 } from '@bhaskardey772/push-notif-backend';
 ```
-
-No `@types/` package is needed.
