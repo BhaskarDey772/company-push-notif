@@ -1,5 +1,8 @@
 # @bhaskardey772/push-notif-frontend
 
+[![npm](https://img.shields.io/npm/v/@bhaskardey772/push-notif-frontend)](https://www.npmjs.com/package/@bhaskardey772/push-notif-frontend)
+[![GitHub](https://img.shields.io/badge/GitHub-source-181717?logo=github)](https://github.com/BhaskarDey772/company-push-notif)
+
 Frontend helper for **Firebase Cloud Messaging (FCM)**. Handle browser notification permission, get FCM device tokens, and listen for push messages — without writing any Firebase boilerplate.
 
 Framework-agnostic (works with React, Vue, Svelte, vanilla JS/TS, or any bundler). Ships with TypeScript declarations.
@@ -409,7 +412,21 @@ interface IncomingNotification {
 
 ### `deleteToken(): Promise<boolean>`
 
-Deletes the current FCM token. Returns `true` on success.
+Deletes the FCM token from the browser and FCM server. Returns `true` on success.
+
+After calling this, also tell your backend to remove the token from its store:
+
+```ts
+const token = await notif.getDeviceToken(); // save before deleting
+
+await notif.deleteToken();
+
+await fetch('/api/unsubscribe', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ token }),
+});
+```
 
 ---
 

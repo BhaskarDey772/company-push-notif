@@ -1,5 +1,8 @@
 # @bhaskardey772/push-notif-backend
 
+[![npm](https://img.shields.io/npm/v/@bhaskardey772/push-notif-backend)](https://www.npmjs.com/package/@bhaskardey772/push-notif-backend)
+[![GitHub](https://img.shields.io/badge/GitHub-source-181717?logo=github)](https://github.com/BhaskarDey772/company-push-notif)
+
 Backend helper for **Firebase Cloud Messaging (FCM)**. Send push notifications to devices, topics, and conditions — without writing any Firebase Admin boilerplate.
 
 Written in TypeScript. Ships with full type declarations.
