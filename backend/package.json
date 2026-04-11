@@ -6,12 +6,14 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/index.js"
     },
     "./slim": {
+      "types": "./dist/index.d.ts",
       "require": "./dist/index.slim.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/index.slim.js"
     }
   },
   "peerDependencies": {

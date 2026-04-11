@@ -15,13 +15,13 @@ export async function init({ firebaseConfig, vapidKey, serviceWorkerPath = '/fir
     return;
   }
 
-  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  _messaging = getMessaging(app);
-  _vapidKey = vapidKey;
-
   if (!('serviceWorker' in navigator)) {
     throw new Error('[@bhaskardey772/push-notif-frontend] Service workers are not supported in this browser.');
   }
+
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  _messaging = getMessaging(app);
+  _vapidKey = vapidKey;
 
   try {
     _swRegistration = await navigator.serviceWorker.register(serviceWorkerPath);

@@ -2,7 +2,20 @@ import fs from 'fs';
 import path from 'path';
 import * as admin from 'firebase-admin';
 import { getMessaging } from 'firebase-admin/messaging';
-import type { Messaging, MessagingTopicManagementResponse, BaseMessage } from 'firebase-admin/messaging';
+import type { Messaging, BaseMessage } from 'firebase-admin/messaging';
+
+export interface ServiceAccount {
+  projectId?: string;
+  clientEmail?: string;
+  privateKey?: string;
+  [key: string]: unknown;
+}
+
+export interface TopicManagementResponse {
+  failureCount: number;
+  successCount: number;
+  errors: Array<{ index: number; error: { code: string; message: string } }>;
+}
 
 export interface NotificationPayload {
   title: string;
@@ -11,9 +24,12 @@ export interface NotificationPayload {
   icon?: string;
   /** Values are auto-converted to strings */
   data?: Record<string, unknown>;
-  android?: admin.messaging.AndroidConfig;
-  apns?: admin.messaging.ApnsConfig;
-  webpush?: admin.messaging.WebpushConfig;
+  /** Raw Firebase Android config override */
+  android?: Record<string, unknown>;
+  /** Raw Firebase APNs (iOS) config override */
+  apns?: Record<string, unknown>;
+  /** Raw Firebase Web Push config override */
+  webpush?: Record<string, unknown>;
 }
 
 export interface SendResult {
@@ -36,13 +52,13 @@ let _messaging: Messaging | null = null;
  * @param appName        - Optional: name the app (useful for multi-project setups)
  */
 export function init(
-  serviceAccount: admin.ServiceAccount | string,
+  serviceAccount: ServiceAccount | string,
   appName?: string,
 ): void {
   const name = appName ?? '[DEFAULT]';
   const existing = admin.apps.find((a) => a?.name === name) ?? undefined;
 
-  const credential = admin.credential.cert(loadServiceAccount(serviceAccount));
+  const credential = admin.credential.cert(loadServiceAccount(serviceAccount) as admin.ServiceAccount);
 
   const app = existing ?? admin.initializeApp({ credential }, appName);
   _messaging = getMessaging(app);
@@ -120,7 +136,7 @@ export async function sendToCondition(
 export async function subscribeToTopic(
   tokens: string | string[],
   topic: string,
-): Promise<MessagingTopicManagementResponse> {
+): Promise<TopicManagementResponse> {
   assertInit();
   assertTopic(topic);
   return _messaging!.subscribeToTopic(normalizeTokens(tokens, 'tokens'), topic);
@@ -129,7 +145,7 @@ export async function subscribeToTopic(
 export async function unsubscribeFromTopic(
   tokens: string | string[],
   topic: string,
-): Promise<MessagingTopicManagementResponse> {
+): Promise<TopicManagementResponse> {
   assertInit();
   assertTopic(topic);
   return _messaging!.unsubscribeFromTopic(normalizeTokens(tokens, 'tokens'), topic);
@@ -143,7 +159,7 @@ function assertInit(): void {
   }
 }
 
-function loadServiceAccount(serviceAccount: admin.ServiceAccount | string): admin.ServiceAccount {
+function loadServiceAccount(serviceAccount: ServiceAccount | string): ServiceAccount {
   if (typeof serviceAccount !== 'string') {
     return assertServiceAccountShape(serviceAccount);
   }
@@ -162,14 +178,14 @@ function loadServiceAccount(serviceAccount: admin.ServiceAccount | string): admi
   }
 
   try {
-    return assertServiceAccountShape(JSON.parse(raw) as admin.ServiceAccount);
+    return assertServiceAccountShape(JSON.parse(raw) as ServiceAccount);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Invalid service account JSON: ${message}`);
   }
 }
 
-function assertServiceAccountShape(serviceAccount: admin.ServiceAccount): admin.ServiceAccount {
+function assertServiceAccountShape(serviceAccount: ServiceAccount): ServiceAccount {
   if (!serviceAccount || typeof serviceAccount !== 'object') {
     throw new Error('serviceAccount must be an object');
   }
@@ -200,10 +216,10 @@ function buildBase(payload: NotificationPayload): MessageBase {
     ...(data && { data: stringifyData(data) }),
     webpush: {
       notification: { ...(icon && { icon }) },
-      ...webpush,
+      ...(webpush as admin.messaging.WebpushConfig),
     },
-    ...(android && { android }),
-    ...(apns && { apns }),
+    ...(android && { android: android as admin.messaging.AndroidConfig }),
+    ...(apns && { apns: apns as admin.messaging.ApnsConfig }),
   };
 }
 
