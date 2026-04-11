@@ -5,16 +5,17 @@
 
 Frontend helper for **Firebase Cloud Messaging (FCM)**. Handle browser notification permission, get FCM device tokens, and listen for push messages — without writing any Firebase boilerplate.
 
-`firebase` is **bundled in** — no extra install needed. Framework-agnostic (works with React, Vue, Svelte, vanilla JS/TS, or any bundler). Ships with TypeScript declarations.
+Framework-agnostic (works with React, Vue, Svelte, vanilla JS/TS, or any bundler). Ships with TypeScript declarations.
 
 ---
 
 ## Table of Contents
 
-- [Requirements](#requirements)
+- [Installation](#installation)
+  - [Default (bundled)](#default-bundled)
+  - [Slim (already have firebase)](#slim-already-have-firebase)
 - [Setup](#setup)
-  - [1. Install](#1-install)
-  - [2. Add the service worker](#2-add-the-service-worker)
+  - [Add the service worker](#add-the-service-worker)
 - [Usage](#usage)
   - [Initialize](#initialize)
   - [Request Permission & Get Token](#request-permission--get-token)
@@ -33,25 +34,50 @@ Frontend helper for **Firebase Cloud Messaging (FCM)**. Handle browser notificat
 
 ---
 
-## Requirements
+## Installation
 
-- A browser that supports [Web Push](https://caniuse.com/push-api) (Chrome 50+, Firefox 44+, Edge 17+, Safari 16+)
-- A bundler — Vite, webpack, Rollup, Parcel, etc.
-- A Firebase project with Cloud Messaging enabled
+### Default (bundled)
 
----
-
-## Setup
-
-### 1. Install
+`firebase` is bundled inside — **nothing else to install**.
 
 ```bash
 npm install @bhaskardey772/push-notif-frontend
 ```
 
-That's it. `firebase` is bundled inside the package — nothing else to install.
+```ts
+import * as notif from '@bhaskardey772/push-notif-frontend';
+```
 
-### 2. Add the service worker
+Use this if your project does **not** already use `firebase`.
+
+---
+
+### Slim (already have firebase)
+
+If your project already uses `firebase` (e.g. for Firestore, Auth, Realtime Database), use the `/slim` entry to avoid bundling a second copy of firebase into your app.
+
+```bash
+npm install @bhaskardey772/push-notif-frontend firebase
+```
+
+```ts
+import * as notif from '@bhaskardey772/push-notif-frontend/slim';
+```
+
+The `/slim` entry uses your project's existing `firebase` — no duplication, no extra bundle weight.
+
+| | Default | Slim |
+|---|---|---|
+| Extra install | None | `firebase` |
+| Import path | `@bhaskardey772/push-notif-frontend` | `@bhaskardey772/push-notif-frontend/slim` |
+| `firebase` in bundle | Yes (bundled in) | No (uses yours) |
+| Use when | Fresh project | Already using `firebase` |
+
+---
+
+## Setup
+
+### Add the service worker
 
 Copy the service worker that ships with this package into your `public/` folder:
 
@@ -73,6 +99,7 @@ Call `init()` **once** when your app starts. It registers the service worker and
 
 ```ts
 import * as notif from '@bhaskardey772/push-notif-frontend';
+// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
 
 await notif.init({
   firebaseConfig: {
@@ -86,6 +113,8 @@ await notif.init({
   vapidKey: 'YOUR_VAPID_KEY',
 });
 ```
+
+All other functions work exactly the same regardless of which entry you use.
 
 **Where to find your credentials:**
 
@@ -102,6 +131,7 @@ await notif.init({
 const token = await notif.requestPermission();
 
 if (token) {
+  // Send token to your backend to register this device
   await fetch('/api/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -112,11 +142,14 @@ if (token) {
 }
 ```
 
+- Shows the browser's native permission dialog if not yet answered
+- Returns the FCM token string on `'granted'`, or `null` on `'denied'`
+
 ---
 
 ### Listen for Foreground Messages
 
-FCM suppresses the native popup when the browser tab is open. Fire `new Notification()` yourself:
+FCM suppresses the native popup when the browser tab is open. Fire `new Notification()` yourself so the user sees it:
 
 ```ts
 const unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl }) => {
@@ -142,11 +175,16 @@ const token = await notif.getDeviceToken();
 
 ### Unsubscribe / Delete Token
 
+On logout or when the user opts out:
+
 ```ts
+// Save token before deleting
 const token = await notif.getDeviceToken();
 
+// 1. Remove from FCM
 await notif.deleteToken();
 
+// 2. Remove from your backend
 await fetch('/api/unsubscribe', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -181,6 +219,7 @@ Create a hook (`src/hooks/usePushNotifications.ts`):
 ```ts
 import { useEffect, useRef, useState } from 'react';
 import * as notif from '@bhaskardey772/push-notif-frontend';
+// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
 
 const FIREBASE_CONFIG = {
   apiKey: 'YOUR_API_KEY',
@@ -198,6 +237,7 @@ export function usePushNotifications() {
   const initialized                 = useRef(false);
 
   useEffect(() => {
+    // useRef guard prevents double-init in React StrictMode
     if (initialized.current) return;
     initialized.current = true;
 
@@ -270,6 +310,7 @@ export default function App() {
 // composables/usePushNotifications.ts
 import { onMounted, onUnmounted, ref } from 'vue';
 import * as notif from '@bhaskardey772/push-notif-frontend';
+// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
 
 const FIREBASE_CONFIG = { /* ... */ };
 const VAPID_KEY = 'YOUR_VAPID_KEY';
@@ -326,6 +367,7 @@ export function usePushNotifications() {
 ```ts
 // main.ts
 import * as notif from '@bhaskardey772/push-notif-frontend';
+// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
 
 const FIREBASE_CONFIG = { /* ... */ };
 const VAPID_KEY = 'YOUR_VAPID_KEY';
@@ -453,3 +495,6 @@ import type { IncomingNotification, InitOptions } from '@bhaskardey772/push-noti
 **Background messages not appearing**
 - Open DevTools → Application → Service Workers and confirm the worker is activated.
 - Try unregistering the SW and reloading — the updated SW activates immediately via `skipWaiting`.
+
+**Using `/slim` but getting "Cannot find module firebase"**
+- Make sure `firebase` is installed in your project: `npm install firebase`

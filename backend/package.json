@@ -1,15 +1,31 @@
 {
   "name": "@bhaskardey772/push-notif-backend",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Backend helper for Firebase Cloud Messaging — send push notifications to devices, topics, and conditions without boilerplate",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./slim": {
+      "require": "./dist/index.slim.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "peerDependencies": {
+    "firebase-admin": ">=11.0.0"
+  },
+  "peerDependenciesMeta": {
+    "firebase-admin": { "optional": true }
+  },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
-    "build": "rm -rf dist && node build.js",
+    "build": "rm -rf dist && node build.mjs",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },

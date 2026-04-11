@@ -5,13 +5,15 @@
 
 Backend helper for **Firebase Cloud Messaging (FCM)**. Send push notifications to devices, topics, and conditions — without writing any Firebase Admin boilerplate.
 
-`firebase-admin` is **bundled in** — no extra install needed. Written in TypeScript. Ships with full type declarations.
+Written in TypeScript. Ships with full type declarations.
 
 ---
 
 ## Table of Contents
 
 - [Installation](#installation)
+  - [Default (bundled)](#default-bundled)
+  - [Slim (already have firebase-admin)](#slim-already-have-firebase-admin)
 - [Setup](#setup)
 - [Complete Express Example](#complete-express-example)
 - [API](#api)
@@ -31,11 +33,42 @@ Backend helper for **Firebase Cloud Messaging (FCM)**. Send push notifications t
 
 ## Installation
 
+### Default (bundled)
+
+`firebase-admin` is bundled inside — **nothing else to install**.
+
 ```bash
 npm install @bhaskardey772/push-notif-backend
 ```
 
-That's it. `firebase-admin` is bundled inside the package — nothing else to install.
+```ts
+import * as notif from '@bhaskardey772/push-notif-backend';
+```
+
+Use this if your project does **not** already use `firebase-admin`.
+
+---
+
+### Slim (already have firebase-admin)
+
+If your project already uses `firebase-admin` (e.g. for Firestore, Auth, or custom admin operations), use the `/slim` entry to avoid bundling a second copy.
+
+```bash
+npm install @bhaskardey772/push-notif-backend firebase-admin
+```
+
+```ts
+import * as notif from '@bhaskardey772/push-notif-backend/slim';
+```
+
+The `/slim` entry uses your project's existing `firebase-admin` — no duplication, no extra weight.
+
+| | Default | Slim |
+|---|---|---|
+| Extra install | None | `firebase-admin` |
+| Import path | `@bhaskardey772/push-notif-backend` | `@bhaskardey772/push-notif-backend/slim` |
+| `firebase-admin` in bundle | Yes (bundled in) | No (uses yours) |
+| Use when | Fresh project | Already using `firebase-admin` |
 
 ---
 
@@ -51,11 +84,12 @@ Firebase Console → Project Settings → Service Accounts → **Generate new pr
 
 ```ts
 import * as notif from '@bhaskardey772/push-notif-backend';
+// or: import * as notif from '@bhaskardey772/push-notif-backend/slim';
 
 notif.init(require('./service-account.json'));
 ```
 
-That's it. Now call any function.
+All other functions work exactly the same regardless of which entry you use.
 
 ---
 
@@ -64,6 +98,7 @@ That's it. Now call any function.
 ```ts
 import express, { Request, Response } from 'express';
 import * as notif from '@bhaskardey772/push-notif-backend';
+// or: import * as notif from '@bhaskardey772/push-notif-backend/slim';
 
 notif.init(require('./service-account.json'));
 
