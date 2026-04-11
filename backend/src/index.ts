@@ -174,7 +174,13 @@ function assertServiceAccountShape(serviceAccount: admin.ServiceAccount): admin.
     throw new Error('serviceAccount must be an object');
   }
 
-  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
+  const obj = serviceAccount as Record<string, unknown>;
+  const hasRequired =
+    (obj.projectId  || obj.project_id)  &&
+    (obj.clientEmail || obj.client_email) &&
+    (obj.privateKey  || obj.private_key);
+
+  if (!hasRequired) {
     throw new Error('serviceAccount must include projectId, clientEmail, and privateKey');
   }
 

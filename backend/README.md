@@ -5,7 +5,7 @@
 
 Backend helper for **Firebase Cloud Messaging (FCM)**. Send push notifications to devices, topics, and conditions — without writing any Firebase Admin boilerplate.
 
-Written in TypeScript. Ships with full type declarations.
+`firebase-admin` is **bundled in** — no extra install needed. Written in TypeScript. Ships with full type declarations.
 
 ---
 
@@ -32,10 +32,10 @@ Written in TypeScript. Ships with full type declarations.
 ## Installation
 
 ```bash
-npm install @bhaskardey772/push-notif-backend firebase-admin
+npm install @bhaskardey772/push-notif-backend
 ```
 
-`firebase-admin` is a peer dependency — install it once in your project.
+That's it. `firebase-admin` is bundled inside the package — nothing else to install.
 
 ---
 
@@ -61,22 +61,17 @@ That's it. Now call any function.
 
 ## Complete Express Example
 
-A full working server with device registration, unregistration, and all send methods:
-
 ```ts
 import express, { Request, Response } from 'express';
 import * as notif from '@bhaskardey772/push-notif-backend';
 
-// Initialize once
 notif.init(require('./service-account.json'));
 
 const app = express();
 app.use(express.json());
 
-// Token store — replace with a real database in production
 const tokens = new Set<string>();
 
-// ── Register a device token (called by the frontend after requestPermission())
 app.post('/api/subscribe', (req: Request, res: Response) => {
   const { token } = req.body;
   if (!token) { res.status(400).json({ error: 'token required' }); return; }
@@ -84,7 +79,6 @@ app.post('/api/subscribe', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-// ── Unregister a device token (called on logout or opt-out)
 app.post('/api/unsubscribe', (req: Request, res: Response) => {
   const { token } = req.body;
   if (!token) { res.status(400).json({ error: 'token required' }); return; }
@@ -92,7 +86,6 @@ app.post('/api/unsubscribe', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-// ── Send to a specific device
 app.post('/api/notify/device', async (req: Request, res: Response) => {
   const { token, title, body, imageUrl, data } = req.body;
   try {
@@ -103,7 +96,6 @@ app.post('/api/notify/device', async (req: Request, res: Response) => {
   }
 });
 
-// ── Broadcast to all registered devices
 app.post('/api/notify/all', async (req: Request, res: Response) => {
   const { title, body, imageUrl, data } = req.body;
   if (tokens.size === 0) { res.status(400).json({ error: 'No registered tokens' }); return; }
@@ -115,7 +107,6 @@ app.post('/api/notify/all', async (req: Request, res: Response) => {
   }
 });
 
-// ── Send to a topic
 app.post('/api/notify/topic', async (req: Request, res: Response) => {
   const { topic, title, body, imageUrl, data } = req.body;
   try {
@@ -126,7 +117,6 @@ app.post('/api/notify/topic', async (req: Request, res: Response) => {
   }
 });
 
-// ── Subscribe / unsubscribe tokens to a topic
 app.post('/api/topic/subscribe', async (req: Request, res: Response) => {
   const { tokens: tokenList, topic } = req.body;
   try {
@@ -199,7 +189,6 @@ const result = await notif.sendToDevices(allTokens, {
 });
 // result: { successCount, failureCount, errors }
 
-// Clean up invalid tokens
 for (const { token, error } of result.errors) {
   if (error.includes('not-registered')) await db.tokens.delete(token);
 }
@@ -274,7 +263,7 @@ interface NotificationPayload {
 
 ```ts
 data: {
-  clickUrl: '/orders/123',  // URL to open when notification is tapped
+  clickUrl: '/orders/123',
   orderId: '123',
   userId: 42,               // Numbers/booleans are auto-converted to strings
 }
@@ -307,7 +296,6 @@ try {
   await notif.sendToDevice(token, payload);
 } catch (err) {
   if (err.errorInfo?.code === 'messaging/registration-token-not-registered') {
-    // Token expired or app uninstalled — remove from your DB
     await db.tokens.delete(token);
   } else {
     console.error('FCM error:', err.message);
