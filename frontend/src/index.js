@@ -26,7 +26,6 @@ export async function init({ firebaseConfig, vapidKey, serviceWorkerPath = '/fir
   try {
     _swRegistration = await navigator.serviceWorker.register(serviceWorkerPath);
 
-    // Wait for the SW to be active (handles both fresh install and already-active)
     const sw = _swRegistration.installing || _swRegistration.waiting || _swRegistration.active;
     if (sw && sw.state !== 'activated') {
       await new Promise((resolve) => {
@@ -39,8 +38,6 @@ export async function init({ firebaseConfig, vapidKey, serviceWorkerPath = '/fir
       });
     }
 
-    // Post the Firebase config to the SW so it can self-initialize.
-    // This eliminates the need for users to paste their config twice.
     const activeSW = _swRegistration.active;
     if (activeSW) {
       activeSW.postMessage({ type: 'FIREBASE_CONFIG', firebaseConfig });

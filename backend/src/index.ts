@@ -1,25 +1,18 @@
+import fs from 'fs';
+import path from 'path';
 import * as admin from 'firebase-admin';
 import { getMessaging } from 'firebase-admin/messaging';
 import type { Messaging, MessagingTopicManagementResponse, BaseMessage } from 'firebase-admin/messaging';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface NotificationPayload {
-  /** Notification title (required) */
   title: string;
-  /** Notification body (required) */
   body: string;
-  /** Large image URL */
   imageUrl?: string;
-  /** Icon URL (web push) */
   icon?: string;
-  /** Custom key-value data — values are auto-converted to strings */
+  /** Values are auto-converted to strings */
   data?: Record<string, unknown>;
-  /** Raw Firebase AndroidConfig override */
   android?: admin.messaging.AndroidConfig;
-  /** Raw Firebase ApnsConfig override */
   apns?: admin.messaging.ApnsConfig;
-  /** Raw Firebase WebpushConfig override */
   webpush?: admin.messaging.WebpushConfig;
 }
 
@@ -33,11 +26,7 @@ export interface BatchResult {
   errors: Array<{ token: string; error: string }>;
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
-
 let _messaging: Messaging | null = null;
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Initialize with your Firebase service account credentials.
@@ -53,24 +42,18 @@ export function init(
   const name = appName ?? '[DEFAULT]';
   const existing = admin.apps.find((a) => a?.name === name) ?? undefined;
 
-  const credential =
-    typeof serviceAccount === 'string'
-      ? admin.credential.cert(require(serviceAccount) as admin.ServiceAccount)
-      : admin.credential.cert(serviceAccount);
+  const credential = admin.credential.cert(loadServiceAccount(serviceAccount));
 
   const app = existing ?? admin.initializeApp({ credential }, appName);
   _messaging = getMessaging(app);
 }
 
-/**
- * Send a notification to a single device token.
- */
 export async function sendToDevice(
   token: string,
   payload: NotificationPayload,
 ): Promise<SendResult> {
   assertInit();
-  if (!token) throw new Error('token must be a non-empty string');
+  assertToken(token, 'token');
 
   const base = buildBase(payload);
   const messageId = await _messaging!.send({ ...base, token });
@@ -86,10 +69,10 @@ export async function sendToDevices(
   payload: NotificationPayload,
 ): Promise<BatchResult> {
   assertInit();
-  if (!tokens.length) throw new Error('tokens must be a non-empty array');
+  const validatedTokens = normalizeTokens(tokens, 'tokens');
 
   const base = buildBase(payload);
-  const chunks = chunkArray(tokens, 500);
+  const chunks = chunkArray(validatedTokens, 500);
   const result: BatchResult = { successCount: 0, failureCount: 0, errors: [] };
 
   for (const chunk of chunks) {
@@ -106,15 +89,12 @@ export async function sendToDevices(
   return result;
 }
 
-/**
- * Send a notification to all devices subscribed to a topic.
- */
 export async function sendToTopic(
   topic: string,
   payload: NotificationPayload,
 ): Promise<SendResult> {
   assertInit();
-  if (!topic) throw new Error('topic must be a non-empty string');
+  assertTopic(topic);
 
   const base = buildBase(payload);
   const messageId = await _messaging!.send({ ...base, topic });
@@ -130,36 +110,30 @@ export async function sendToCondition(
   payload: NotificationPayload,
 ): Promise<SendResult> {
   assertInit();
-  if (!condition) throw new Error('condition must be a non-empty string');
+  if (!condition.trim()) throw new Error('condition must be a non-empty string');
 
   const base = buildBase(payload);
   const messageId = await _messaging!.send({ ...base, condition });
   return { messageId };
 }
 
-/**
- * Subscribe one or more device tokens to a topic.
- */
 export async function subscribeToTopic(
   tokens: string | string[],
   topic: string,
 ): Promise<MessagingTopicManagementResponse> {
   assertInit();
-  return _messaging!.subscribeToTopic([tokens].flat(), topic);
+  assertTopic(topic);
+  return _messaging!.subscribeToTopic(normalizeTokens(tokens, 'tokens'), topic);
 }
 
-/**
- * Unsubscribe one or more device tokens from a topic.
- */
 export async function unsubscribeFromTopic(
   tokens: string | string[],
   topic: string,
 ): Promise<MessagingTopicManagementResponse> {
   assertInit();
-  return _messaging!.unsubscribeFromTopic([tokens].flat(), topic);
+  assertTopic(topic);
+  return _messaging!.unsubscribeFromTopic(normalizeTokens(tokens, 'tokens'), topic);
 }
-
-// ─── Internals ────────────────────────────────────────────────────────────────
 
 function assertInit(): void {
   if (!_messaging) {
@@ -167,6 +141,44 @@ function assertInit(): void {
       '[@bhaskardey772/push-notif-backend] Call init(serviceAccount) before using other methods.',
     );
   }
+}
+
+function loadServiceAccount(serviceAccount: admin.ServiceAccount | string): admin.ServiceAccount {
+  if (typeof serviceAccount !== 'string') {
+    return assertServiceAccountShape(serviceAccount);
+  }
+
+  const resolvedPath = path.resolve(serviceAccount);
+  if (path.extname(resolvedPath).toLowerCase() !== '.json') {
+    throw new Error('serviceAccount path must point to a JSON file');
+  }
+
+  let raw: string;
+  try {
+    raw = fs.readFileSync(resolvedPath, 'utf8');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Unable to read service account file: ${message}`);
+  }
+
+  try {
+    return assertServiceAccountShape(JSON.parse(raw) as admin.ServiceAccount);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid service account JSON: ${message}`);
+  }
+}
+
+function assertServiceAccountShape(serviceAccount: admin.ServiceAccount): admin.ServiceAccount {
+  if (!serviceAccount || typeof serviceAccount !== 'object') {
+    throw new Error('serviceAccount must be an object');
+  }
+
+  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
+    throw new Error('serviceAccount must include projectId, clientEmail, and privateKey');
+  }
+
+  return serviceAccount;
 }
 
 /** Shared message fields excluding the routing target (token / topic / condition). */
@@ -187,6 +199,31 @@ function buildBase(payload: NotificationPayload): MessageBase {
     ...(android && { android }),
     ...(apns && { apns }),
   };
+}
+
+function normalizeTokens(tokens: string | string[], fieldName: string): string[] {
+  const normalized = [tokens].flat().map((token) => {
+    assertToken(token, fieldName);
+    return token.trim();
+  });
+
+  if (!normalized.length) {
+    throw new Error(`${fieldName} must be a non-empty string or array of strings`);
+  }
+
+  return [...new Set(normalized)];
+}
+
+function assertToken(token: string, fieldName: string): void {
+  if (typeof token !== 'string' || !token.trim()) {
+    throw new Error(`${fieldName} must be a non-empty string`);
+  }
+}
+
+function assertTopic(topic: string): void {
+  if (typeof topic !== 'string' || !topic.trim()) {
+    throw new Error('topic must be a non-empty string');
+  }
 }
 
 function stringifyData(data: Record<string, unknown>): Record<string, string> {
