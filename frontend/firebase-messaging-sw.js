@@ -10,7 +10,7 @@ self.addEventListener('activate', (event) => event.waitUntil(clients.claim()));
 
 let messaging = null;
 
-// Receive Firebase config from the app (posted by @bhaskardey772/push-notif-frontend init())
+// Receive Firebase config from the app (posted by @bhaskardey772/fcm-frontend init())
 // This means users only configure firebaseConfig in ONE place — their app code.
 self.addEventListener('message', (event) => {
   if (event.data?.type !== 'FIREBASE_CONFIG') return;

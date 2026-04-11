@@ -6,17 +6,17 @@ let _vapidKey = null;
 let _swRegistration = null;
 
 export async function init({ firebaseConfig, vapidKey, serviceWorkerPath = '/firebase-messaging-sw.js' }) {
-  if (!firebaseConfig) throw new Error('[@bhaskardey772/push-notif-frontend] firebaseConfig is required');
-  if (!vapidKey) throw new Error('[@bhaskardey772/push-notif-frontend] vapidKey is required');
+  if (!firebaseConfig) throw new Error('[@bhaskardey772/fcm-frontend] firebaseConfig is required');
+  if (!vapidKey) throw new Error('[@bhaskardey772/fcm-frontend] vapidKey is required');
 
   const supported = await isSupported();
   if (!supported) {
-    console.warn('[@bhaskardey772/push-notif-frontend] Firebase Messaging is not supported in this browser.');
+    console.warn('[@bhaskardey772/fcm-frontend] Firebase Messaging is not supported in this browser.');
     return;
   }
 
   if (!('serviceWorker' in navigator)) {
-    throw new Error('[@bhaskardey772/push-notif-frontend] Service workers are not supported in this browser.');
+    throw new Error('[@bhaskardey772/fcm-frontend] Service workers are not supported in this browser.');
   }
 
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -43,7 +43,7 @@ export async function init({ firebaseConfig, vapidKey, serviceWorkerPath = '/fir
       activeSW.postMessage({ type: 'FIREBASE_CONFIG', firebaseConfig });
     }
   } catch (err) {
-    console.error('[@bhaskardey772/push-notif-frontend] Service worker registration failed:', err);
+    console.error('[@bhaskardey772/fcm-frontend] Service worker registration failed:', err);
     throw err;
   }
 }
@@ -52,7 +52,7 @@ export async function requestPermission() {
   assertInit();
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    console.warn('[@bhaskardey772/push-notif-frontend] Notification permission denied.');
+    console.warn('[@bhaskardey772/fcm-frontend] Notification permission denied.');
     return null;
   }
   return _getToken();
@@ -81,7 +81,7 @@ export async function deleteToken() {
 function assertInit() {
   if (!_messaging) {
     throw new Error(
-      '[@bhaskardey772/push-notif-frontend] Call notif.init({ firebaseConfig, vapidKey }) before using other methods.'
+      '[@bhaskardey772/fcm-frontend] Call notif.init({ firebaseConfig, vapidKey }) before using other methods.'
     );
   }
 }
@@ -94,7 +94,7 @@ async function _getToken() {
     });
     return token || null;
   } catch (err) {
-    console.error('[@bhaskardey772/push-notif-frontend] Failed to get FCM token:', err);
+    console.error('[@bhaskardey772/fcm-frontend] Failed to get FCM token:', err);
     throw err;
   }
 }

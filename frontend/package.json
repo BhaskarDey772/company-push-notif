@@ -1,6 +1,6 @@
 {
-  "name": "@bhaskardey772/push-notif-frontend",
-  "version": "1.2.1",
+  "name": "@bhaskardey772/fcm-frontend",
+  "version": "1.0.0",
   "description": "Frontend helper for Firebase Cloud Messaging — request permission, get FCM tokens, and handle push notifications without boilerplate",
   "main": "dist/index.js",
   "module": "dist/index.js",

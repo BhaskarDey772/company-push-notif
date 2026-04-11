@@ -1,6 +1,6 @@
-# @bhaskardey772/push-notif-frontend
+# @bhaskardey772/fcm-frontend
 
-[![npm](https://img.shields.io/npm/v/@bhaskardey772/push-notif-frontend)](https://www.npmjs.com/package/@bhaskardey772/push-notif-frontend)
+[![npm](https://img.shields.io/npm/v/@bhaskardey772/fcm-frontend)](https://www.npmjs.com/package/@bhaskardey772/fcm-frontend)
 [![GitHub](https://img.shields.io/badge/GitHub-source-181717?logo=github)](https://github.com/BhaskarDey772/company-push-notif)
 
 Frontend helper for **Firebase Cloud Messaging (FCM)**. Handle browser notification permission, get FCM device tokens, and listen for push messages — without writing any Firebase boilerplate.
@@ -41,11 +41,11 @@ Framework-agnostic (works with React, Vue, Svelte, vanilla JS/TS, or any bundler
 `firebase` is bundled inside — **nothing else to install**.
 
 ```bash
-npm install @bhaskardey772/push-notif-frontend
+npm install @bhaskardey772/fcm-frontend
 ```
 
 ```ts
-import * as notif from '@bhaskardey772/push-notif-frontend';
+import * as notif from '@bhaskardey772/fcm-frontend';
 ```
 
 Use this if your project does **not** already use `firebase`.
@@ -57,11 +57,11 @@ Use this if your project does **not** already use `firebase`.
 If your project already uses `firebase` (e.g. for Firestore, Auth, Realtime Database), use the `/slim` entry to avoid bundling a second copy of firebase into your app.
 
 ```bash
-npm install @bhaskardey772/push-notif-frontend firebase
+npm install @bhaskardey772/fcm-frontend firebase
 ```
 
 ```ts
-import * as notif from '@bhaskardey772/push-notif-frontend/slim';
+import * as notif from '@bhaskardey772/fcm-frontend/slim';
 ```
 
 The `/slim` entry uses your project's existing `firebase` — no duplication, no extra bundle weight.
@@ -69,7 +69,7 @@ The `/slim` entry uses your project's existing `firebase` — no duplication, no
 | | Default | Slim |
 |---|---|---|
 | Extra install | None | `firebase` |
-| Import path | `@bhaskardey772/push-notif-frontend` | `@bhaskardey772/push-notif-frontend/slim` |
+| Import path | `@bhaskardey772/fcm-frontend` | `@bhaskardey772/fcm-frontend/slim` |
 | `firebase` in bundle | Yes (bundled in) | No (uses yours) |
 | Use when | Fresh project | Already using `firebase` |
 
@@ -82,7 +82,7 @@ The `/slim` entry uses your project's existing `firebase` — no duplication, no
 Copy the service worker that ships with this package into your `public/` folder:
 
 ```bash
-cp node_modules/@bhaskardey772/push-notif-frontend/firebase-messaging-sw.js public/
+cp node_modules/@bhaskardey772/fcm-frontend/firebase-messaging-sw.js public/
 ```
 
 > **No config needed inside the file.** When you call `init()`, the package automatically sends your `firebaseConfig` to the service worker. You only configure Firebase in one place — your app code.
@@ -98,8 +98,8 @@ The file must be served at the root path `/firebase-messaging-sw.js`. Vite and C
 Call `init()` **once** when your app starts. It registers the service worker and posts your Firebase config to it automatically.
 
 ```ts
-import * as notif from '@bhaskardey772/push-notif-frontend';
-// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
+import * as notif from '@bhaskardey772/fcm-frontend';
+// or: import * as notif from '@bhaskardey772/fcm-frontend/slim';
 
 await notif.init({
   firebaseConfig: {
@@ -218,8 +218,8 @@ Create a hook (`src/hooks/usePushNotifications.ts`):
 
 ```ts
 import { useEffect, useRef, useState } from 'react';
-import * as notif from '@bhaskardey772/push-notif-frontend';
-// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
+import * as notif from '@bhaskardey772/fcm-frontend';
+// or: import * as notif from '@bhaskardey772/fcm-frontend/slim';
 
 const FIREBASE_CONFIG = {
   apiKey: 'YOUR_API_KEY',
@@ -309,8 +309,8 @@ export default function App() {
 ```ts
 // composables/usePushNotifications.ts
 import { onMounted, onUnmounted, ref } from 'vue';
-import * as notif from '@bhaskardey772/push-notif-frontend';
-// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
+import * as notif from '@bhaskardey772/fcm-frontend';
+// or: import * as notif from '@bhaskardey772/fcm-frontend/slim';
 
 const FIREBASE_CONFIG = { /* ... */ };
 const VAPID_KEY = 'YOUR_VAPID_KEY';
@@ -366,8 +366,8 @@ export function usePushNotifications() {
 
 ```ts
 // main.ts
-import * as notif from '@bhaskardey772/push-notif-frontend';
-// or: import * as notif from '@bhaskardey772/push-notif-frontend/slim';
+import * as notif from '@bhaskardey772/fcm-frontend';
+// or: import * as notif from '@bhaskardey772/fcm-frontend/slim';
 
 const FIREBASE_CONFIG = { /* ... */ };
 const VAPID_KEY = 'YOUR_VAPID_KEY';
@@ -475,7 +475,7 @@ The service worker (`firebase-messaging-sw.js`) receives its Firebase config fro
 No `@types/` package needed. Import types directly:
 
 ```ts
-import type { IncomingNotification, InitOptions } from '@bhaskardey772/push-notif-frontend';
+import type { IncomingNotification, InitOptions } from '@bhaskardey772/fcm-frontend';
 ```
 
 ---

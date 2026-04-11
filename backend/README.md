@@ -1,6 +1,6 @@
-# @bhaskardey772/push-notif-backend
+# @bhaskardey772/fcm-backend
 
-[![npm](https://img.shields.io/npm/v/@bhaskardey772/push-notif-backend)](https://www.npmjs.com/package/@bhaskardey772/push-notif-backend)
+[![npm](https://img.shields.io/npm/v/@bhaskardey772/fcm-backend)](https://www.npmjs.com/package/@bhaskardey772/fcm-backend)
 [![GitHub](https://img.shields.io/badge/GitHub-source-181717?logo=github)](https://github.com/BhaskarDey772/company-push-notif)
 
 Backend helper for **Firebase Cloud Messaging (FCM)**. Send push notifications to devices, topics, and conditions — without writing any Firebase Admin boilerplate.
@@ -38,11 +38,11 @@ Written in TypeScript. Ships with full type declarations.
 `firebase-admin` is bundled inside — **nothing else to install**.
 
 ```bash
-npm install @bhaskardey772/push-notif-backend
+npm install @bhaskardey772/fcm-backend
 ```
 
 ```ts
-import * as notif from '@bhaskardey772/push-notif-backend';
+import * as notif from '@bhaskardey772/fcm-backend';
 ```
 
 Use this if your project does **not** already use `firebase-admin`.
@@ -54,11 +54,11 @@ Use this if your project does **not** already use `firebase-admin`.
 If your project already uses `firebase-admin` (e.g. for Firestore, Auth, or custom admin operations), use the `/slim` entry to avoid bundling a second copy.
 
 ```bash
-npm install @bhaskardey772/push-notif-backend firebase-admin
+npm install @bhaskardey772/fcm-backend firebase-admin
 ```
 
 ```ts
-import * as notif from '@bhaskardey772/push-notif-backend/slim';
+import * as notif from '@bhaskardey772/fcm-backend/slim';
 ```
 
 The `/slim` entry uses your project's existing `firebase-admin` — no duplication, no extra weight.
@@ -66,7 +66,7 @@ The `/slim` entry uses your project's existing `firebase-admin` — no duplicati
 | | Default | Slim |
 |---|---|---|
 | Extra install | None | `firebase-admin` |
-| Import path | `@bhaskardey772/push-notif-backend` | `@bhaskardey772/push-notif-backend/slim` |
+| Import path | `@bhaskardey772/fcm-backend` | `@bhaskardey772/fcm-backend/slim` |
 | `firebase-admin` in bundle | Yes (bundled in) | No (uses yours) |
 | Use when | Fresh project | Already using `firebase-admin` |
 
@@ -83,8 +83,8 @@ Firebase Console → Project Settings → Service Accounts → **Generate new pr
 **2. Initialize once at app startup**
 
 ```ts
-import * as notif from '@bhaskardey772/push-notif-backend';
-// or: import * as notif from '@bhaskardey772/push-notif-backend/slim';
+import * as notif from '@bhaskardey772/fcm-backend';
+// or: import * as notif from '@bhaskardey772/fcm-backend/slim';
 
 notif.init(require('./service-account.json'));
 ```
@@ -97,8 +97,8 @@ All other functions work exactly the same regardless of which entry you use.
 
 ```ts
 import express, { Request, Response } from 'express';
-import * as notif from '@bhaskardey772/push-notif-backend';
-// or: import * as notif from '@bhaskardey772/push-notif-backend/slim';
+import * as notif from '@bhaskardey772/fcm-backend';
+// or: import * as notif from '@bhaskardey772/fcm-backend/slim';
 
 notif.init(require('./service-account.json'));
 
@@ -358,5 +358,5 @@ import type {
   NotificationPayload,
   SendResult,
   BatchResult,
-} from '@bhaskardey772/push-notif-backend';
+} from '@bhaskardey772/fcm-backend';
 ```

@@ -154,7 +154,7 @@ export async function unsubscribeFromTopic(
 function assertInit(): void {
   if (!_messaging) {
     throw new Error(
-      '[@bhaskardey772/push-notif-backend] Call init(serviceAccount) before using other methods.',
+      '[@bhaskardey772/fcm-backend] Call init(serviceAccount) before using other methods.',
     );
   }
 }
