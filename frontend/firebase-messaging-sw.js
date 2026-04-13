@@ -1,42 +1,41 @@
-// firebase-messaging-sw.js
-// Copy this file to your project's public/ directory as-is.
-// No Firebase config needed here — the package sends it automatically.
-
-importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-compat.js');
-
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(clients.claim()));
 
-let messaging = null;
+self.addEventListener('push', (event) => {
+  event.waitUntil(handlePush(event));
+});
 
-// Receive Firebase config from the app (posted by @bhaskardey772/fcm-frontend init())
-// This means users only configure firebaseConfig in ONE place — their app code.
-self.addEventListener('message', (event) => {
-  if (event.data?.type !== 'FIREBASE_CONFIG') return;
-  if (messaging) return; // already initialized
+async function handlePush(event) {
+  // Skip if the app is already open and visible in any window.
+  const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+  if (windowClients.some((c) => c.visibilityState === 'visible')) return;
 
-  firebase.initializeApp(event.data.firebaseConfig);
-  messaging = firebase.messaging();
+  let title = '';
+  let options = {};
 
-  messaging.onBackgroundMessage((payload) => {
+  try {
+    const payload = event.data ? event.data.json() : {};
     const n    = payload.notification ?? {};
     const data = payload.data ?? {};
-    const title = n.title || data.title;
-    const body  = n.body  || data.body || '';
 
-    if (!title) return;
+    title = n.title || data.title || 'Notification';
 
-    self.registration.showNotification(title, {
-      body,
-      icon: n.icon || '/favicon.svg',
-      badge: '/favicon.svg',
-      tag: `fcm:${title}:${body}`,
-      data: { url: data.clickUrl || '/', ...data },
+    options = {
+      body:               n.body  || data.body  || '',
+      icon:               n.icon  || data.icon  || '/favicon.svg',
+      badge:              '/favicon.svg',
+      image:              n.image || data.image,
+      tag:                data.tag || `fcm-${Date.now()}`,
+      data:               data,
       requireInteraction: true,
-    });
-  });
-});
+    };
+  } catch (_) {
+    title   = 'Notification';
+    options = { icon: '/favicon.svg', tag: `fcm-${Date.now()}` };
+  }
+
+  await self.registration.showNotification(title, options);
+}
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

@@ -1,6 +1,6 @@
 {
   "name": "@bhaskardey772/fcm-backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Backend helper for Firebase Cloud Messaging — send push notifications to devices, topics, and conditions without boilerplate",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

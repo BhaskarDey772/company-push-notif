@@ -37,11 +37,6 @@ export async function init({ firebaseConfig, vapidKey, serviceWorkerPath = '/fir
         });
       });
     }
-
-    const activeSW = _swRegistration.active;
-    if (activeSW) {
-      activeSW.postMessage({ type: 'FIREBASE_CONFIG', firebaseConfig });
-    }
   } catch (err) {
     console.error('[@bhaskardey772/fcm-frontend] Service worker registration failed:', err);
     throw err;
