@@ -485,6 +485,42 @@ import type { IncomingNotification, InitOptions } from '@bhaskardey772/fcm-front
 
 ---
 
+## Service Worker — Supported `data` Fields
+
+The service worker reads these fields from the `data` object of your FCM message. All are optional.
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | `string` | Notification title (fallback if `notification.title` is absent) |
+| `body` | `string` | Notification body (fallback if `notification.body` is absent) |
+| `icon` | `string` | URL of the notification icon |
+| `badge` | `string` | URL of the small monochrome badge icon (status bar) |
+| `image` | `string` | URL of a large inline image |
+| `url` | `string` | URL to open when the notification is clicked (default: `/`) |
+| `clickUrl` | `string` | Alias for `url` |
+| `tag` | `string` | Groups notifications — a new notification with the same tag replaces the old one |
+| `actions` | `string` | JSON array of action buttons: `[{"action":"view","title":"View"}]` |
+| `requireInteraction` | `string` | Set to `"false"` to let the OS auto-dismiss the notification |
+
+**Example — sending with action buttons from your backend:**
+
+```ts
+await notif.sendToDevice(token, {
+  title: 'New message',
+  body: 'You have a new message.',
+  data: {
+    url: '/messages',
+    tag: 'chat',
+    actions: JSON.stringify([
+      { action: 'reply',    title: 'Reply' },
+      { action: 'dismiss',  title: 'Dismiss' },
+    ]),
+  },
+});
+```
+
+---
+
 ## Troubleshooting
 
 **"Service worker registration failed"**
@@ -495,7 +531,7 @@ import type { IncomingNotification, InitOptions } from '@bhaskardey772/fcm-front
 - `getPermissionState()` returning `'denied'` means the user blocked notifications. They must re-enable manually in browser settings — you cannot re-prompt programmatically.
 
 **Notification not showing when app is open**
-- This is intentional. The service worker suppresses popups when the app is visible (WhatsApp behaviour). Use `onForegroundMessage` to handle in-app.
+- This is intentional. The service worker suppresses popups only when the app tab is the currently focused window (WhatsApp behaviour). If the tab is open but the user switched to another window or tab, the notification will still appear. Use `onForegroundMessage` for in-app handling.
 
 **Notification not showing when tab is closed or browser is in background**
 - Open DevTools → Application → Service Workers and confirm the worker is activated with no errors.
