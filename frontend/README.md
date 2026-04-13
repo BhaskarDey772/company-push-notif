@@ -85,9 +85,9 @@ Copy the service worker that ships with this package into your `public/` folder:
 cp node_modules/@bhaskardey772/fcm-frontend/firebase-messaging-sw.js public/
 ```
 
-> **No config needed inside the file.** When you call `init()`, the package automatically sends your `firebaseConfig` to the service worker. You only configure Firebase in one place — your app code.
-
 The file must be served at the root path `/firebase-messaging-sw.js`. Vite and Create React App copy everything from `public/` to the build root automatically.
+
+> **No Firebase config needed inside the file.** The service worker handles push events using the native Web Push API — it does not depend on the Firebase SDK. Your `firebaseConfig` is only needed in your app code for token generation.
 
 ---
 
@@ -95,7 +95,7 @@ The file must be served at the root path `/firebase-messaging-sw.js`. Vite and C
 
 ### Initialize
 
-Call `init()` **once** when your app starts. It registers the service worker and posts your Firebase config to it automatically.
+Call `init()` **once** when your app starts. It registers the service worker and sets up Firebase Messaging for token generation and foreground message handling.
 
 ```ts
 import * as notif from '@bhaskardey772/fcm-frontend';
@@ -149,11 +149,12 @@ if (token) {
 
 ### Listen for Foreground Messages
 
-FCM suppresses the native popup when the browser tab is open. Fire `new Notification()` yourself so the user sees it:
+The service worker suppresses the native popup when the app is already visible — the same behaviour as WhatsApp. Use `onForegroundMessage` if you want to react to an incoming push while the user is in the app (e.g. show an in-app toast, update a badge):
 
 ```ts
-const unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl }) => {
-  new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
+const unsubscribe = notif.onForegroundMessage(({ title, body, data }) => {
+  // e.g. show a custom in-app banner instead of a system notification
+  console.log('New message while app is open:', title, body, data);
 });
 
 // Stop listening when component unmounts
@@ -243,8 +244,9 @@ export function usePushNotifications() {
 
     notif.init({ firebaseConfig: FIREBASE_CONFIG, vapidKey: VAPID_KEY });
 
-    const unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl }) => {
-      new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
+    const unsubscribe = notif.onForegroundMessage(({ title, body }) => {
+      // App is visible — SW won't show a popup. Handle in-app here if needed.
+      console.log('Foreground message:', title, body);
     });
 
     return () => unsubscribe();
@@ -323,8 +325,9 @@ export function usePushNotifications() {
   onMounted(async () => {
     await notif.init({ firebaseConfig: FIREBASE_CONFIG, vapidKey: VAPID_KEY });
 
-    unsubscribe = notif.onForegroundMessage(({ title, body, imageUrl }) => {
-      new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
+    unsubscribe = notif.onForegroundMessage(({ title, body }) => {
+      // App is visible — SW won't show a popup. Handle in-app here if needed.
+      console.log('Foreground message:', title, body);
     });
   });
 
@@ -374,8 +377,9 @@ const VAPID_KEY = 'YOUR_VAPID_KEY';
 
 await notif.init({ firebaseConfig: FIREBASE_CONFIG, vapidKey: VAPID_KEY });
 
-notif.onForegroundMessage(({ title, body, imageUrl }) => {
-  new Notification(title, { body, icon: imageUrl || '/favicon.svg' });
+notif.onForegroundMessage(({ title, body }) => {
+  // App is visible — SW won't show a popup. Handle in-app here if needed.
+  console.log('Foreground message:', title, body);
 });
 
 document.getElementById('subscribeBtn')!.addEventListener('click', async () => {
@@ -408,7 +412,7 @@ document.getElementById('unsubscribeBtn')!.addEventListener('click', async () =>
 
 ### `init(options): Promise<void>`
 
-Registers the service worker and automatically posts `firebaseConfig` to it. Must be called before any other function.
+Registers the service worker and initialises Firebase Messaging for token generation and foreground message handling. Must be called before any other function.
 
 ```ts
 interface InitOptions {
@@ -440,7 +444,7 @@ Returns the current permission state synchronously.
 
 ### `onForegroundMessage(handler): () => void`
 
-Fires when a push message arrives while the tab is open. Returns an unsubscribe function.
+Fires when a push message arrives while the app tab is open and visible. The service worker suppresses the native popup in this state, so use this to show a custom in-app notification or update UI. Returns an unsubscribe function.
 
 ```ts
 interface IncomingNotification {
@@ -462,11 +466,12 @@ Deletes the FCM token from the browser. Call this on logout or opt-out, then als
 
 | App state | What happens |
 |---|---|
-| **Tab open** | `onForegroundMessage` fires — call `new Notification()` yourself |
-| **Tab closed, browser running** | Service worker wakes up → shows native OS popup automatically |
-| **Browser fully closed** | Queued by the OS push service, delivered when browser next starts |
+| **App visible (tab open & focused)** | SW suppresses the popup — `onForegroundMessage` fires for in-app handling |
+| **App in background (tab hidden / minimised)** | SW shows native OS popup automatically |
+| **Browser running, tab closed** | SW shows native OS popup automatically |
+| **Browser fully closed** | Push is queued by the OS push service and delivered when the browser next starts |
 
-The service worker (`firebase-messaging-sw.js`) receives its Firebase config from `init()` via `postMessage` — you never need to edit it.
+The service worker handles push events using the native Web Push API — no Firebase SDK is loaded inside it. Your `firebaseConfig` is only used in your app code (for token generation and foreground messages). You never need to edit `firebase-messaging-sw.js`.
 
 ---
 
@@ -489,12 +494,17 @@ import type { IncomingNotification, InitOptions } from '@bhaskardey772/fcm-front
 **Token is `null` after `requestPermission()`**
 - `getPermissionState()` returning `'denied'` means the user blocked notifications. They must re-enable manually in browser settings — you cannot re-prompt programmatically.
 
-**Foreground messages not appearing**
-- Call `new Notification(title, { body })` inside `onForegroundMessage`. FCM suppresses the native popup when the tab is open.
+**Notification not showing when app is open**
+- This is intentional. The service worker suppresses popups when the app is visible (WhatsApp behaviour). Use `onForegroundMessage` to handle in-app.
 
-**Background messages not appearing**
-- Open DevTools → Application → Service Workers and confirm the worker is activated.
+**Notification not showing when tab is closed or browser is in background**
+- Open DevTools → Application → Service Workers and confirm the worker is activated with no errors.
 - Try unregistering the SW and reloading — the updated SW activates immediately via `skipWaiting`.
+
+**Notification not showing when browser is fully closed**
+- This requires the browser's background process to be running.
+- Chrome: Settings → System → enable **"Continue running background apps when Google Chrome is closed"**.
+- Firefox: `about:config` → `dom.push.enabled` → `true`.
 
 **Using `/slim` but getting "Cannot find module firebase"**
 - Make sure `firebase` is installed in your project: `npm install firebase`

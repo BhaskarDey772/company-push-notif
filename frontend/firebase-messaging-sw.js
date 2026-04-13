@@ -6,11 +6,13 @@ self.addEventListener('push', (event) => {
 });
 
 async function handlePush(event) {
-  // Skip if the app is already open and visible in any window.
+  // Suppress only when the user has the app tab actively focused — same as OneSignal.
+  // visibilityState === 'visible' is too aggressive: it suppresses even when the user
+  // is on a different tab or window. client.focused is the correct check.
   const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-  if (windowClients.some((c) => c.visibilityState === 'visible')) return;
+  if (windowClients.some((c) => c.focused)) return;
 
-  let title = '';
+  let title   = '';
   let options = {};
 
   try {
@@ -20,18 +22,33 @@ async function handlePush(event) {
 
     title = n.title || data.title || 'Notification';
 
+    // Action buttons — sender can pass: data.actions = '[{"action":"open","title":"View"}]'
+    let actions = [];
+    try { actions = JSON.parse(data.actions || '[]'); } catch (_) {}
+
     options = {
       body:               n.body  || data.body  || '',
       icon:               n.icon  || data.icon  || '/favicon.svg',
-      badge:              '/favicon.svg',
-      image:              n.image || data.image,
-      tag:                data.tag || `fcm-${Date.now()}`,
-      data:               data,
-      requireInteraction: true,
+      badge:              n.badge || data.badge || '/favicon.svg',
+      image:              n.image || data.image  || undefined,
+      tag:                data.tag || undefined,
+      renotify:           !!data.tag,   // re-alert only when sender sets an explicit tag
+      timestamp:          Date.now(),
+      vibrate:            [200, 100, 200],
+      actions,
+      data:               { url: data.url || data.clickUrl || '/', ...data },
+      requireInteraction: data.requireInteraction !== 'false',
     };
   } catch (_) {
     title   = 'Notification';
-    options = { icon: '/favicon.svg', tag: `fcm-${Date.now()}` };
+    options = {
+      icon:               '/favicon.svg',
+      badge:              '/favicon.svg',
+      timestamp:          Date.now(),
+      vibrate:            [200, 100, 200],
+      data:               { url: '/' },
+      requireInteraction: true,
+    };
   }
 
   await self.registration.showNotification(title, options);
@@ -39,12 +56,14 @@ async function handlePush(event) {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
   const url = event.notification.data?.url || '/';
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if (client.url === url && 'focus' in client) return client.focus();
-      }
+      // Find any open window from the same origin — navigate it rather than opening a new tab.
+      const existing = list.find((c) => new URL(c.url).origin === self.location.origin);
+      if (existing) return existing.focus().then((w) => w.navigate(url));
       return clients.openWindow(url);
     })
   );
