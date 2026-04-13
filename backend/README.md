@@ -24,6 +24,8 @@ Written in TypeScript. Ships with full type declarations.
   - [sendToCondition](#sendtoconditioncondition-payload)
   - [subscribeToTopic](#subscribetotopictokens-topic)
   - [unsubscribeFromTopic](#unsubscribefromtopictokens-topic)
+  - [addTokensToTopic](#addtokenstotopictokens-topic)
+  - [removeTokensFromTopic](#removetokensfromtopictokens-topic)
 - [Payload Reference](#payload-reference)
 - [Return Types](#return-types)
 - [Error Handling](#error-handling)
@@ -172,6 +174,26 @@ app.post('/api/topic/unsubscribe', async (req: Request, res: Response) => {
   }
 });
 
+app.post('/api/topic/add-tokens', async (req: Request, res: Response) => {
+  const { tokens: tokenList, topic } = req.body;
+  try {
+    const result = await notif.addTokensToTopic(tokenList, topic);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/topic/remove-tokens', async (req: Request, res: Response) => {
+  const { tokens: tokenList, topic } = req.body;
+  try {
+    const result = await notif.removeTokensFromTopic(tokenList, topic);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 app.listen(3000, () => console.log('Server running on :3000'));
 ```
 
@@ -279,6 +301,32 @@ await notif.unsubscribeFromTopic(userToken, 'sports');
 
 ---
 
+### `addTokensToTopic(tokens, topic)`
+
+Add one or more device tokens to a topic. Accepts a single token or an array. Duplicate tokens in the input are deduplicated automatically.
+
+```ts
+await notif.addTokensToTopic('device-token-abc', 'news');
+await notif.addTokensToTopic(['token1', 'token2', 'token3'], 'news');
+```
+
+Returns the same `TopicManagementResponse` as `subscribeToTopic`. Use this when you want to explicitly express the intent of adding tokens to an existing topic, rather than a first-time subscription.
+
+---
+
+### `removeTokensFromTopic(tokens, topic)`
+
+Remove one or more device tokens from a topic. Accepts a single token or an array. Duplicate tokens in the input are deduplicated automatically.
+
+```ts
+await notif.removeTokensFromTopic('device-token-abc', 'news');
+await notif.removeTokensFromTopic(['token1', 'token2'], 'news');
+```
+
+Returns the same `TopicManagementResponse` as `unsubscribeFromTopic`.
+
+---
+
 ## Payload Reference
 
 ```ts
@@ -358,5 +406,6 @@ import type {
   NotificationPayload,
   SendResult,
   BatchResult,
+  TopicManagementResponse,
 } from '@bhaskardey772/fcm-backend';
 ```

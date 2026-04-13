@@ -151,6 +151,20 @@ export async function unsubscribeFromTopic(
   return _messaging!.unsubscribeFromTopic(normalizeTokens(tokens, 'tokens'), topic);
 }
 
+export async function addTokensToTopic(
+  tokens: string | string[],
+  topic: string,
+): Promise<TopicManagementResponse> {
+  return subscribeToTopic(tokens, topic);
+}
+
+export async function removeTokensFromTopic(
+  tokens: string | string[],
+  topic: string,
+): Promise<TopicManagementResponse> {
+  return unsubscribeFromTopic(tokens, topic);
+}
+
 function assertInit(): void {
   if (!_messaging) {
     throw new Error(
